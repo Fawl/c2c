@@ -1,8 +1,9 @@
 import csv
 import datetime
+import os
 
 from typing import Dict, List
-from collections import deque, defaultdict
+from collections import defaultdict
 from queue import Queue
 
 
@@ -11,7 +12,7 @@ from queue import Queue
 
 
 class Order:
-    def __init__(self, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int) -> None:
+    def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int) -> None:
         '''
         Class representing a single order
         @param time: datetime
@@ -22,6 +23,7 @@ class Order:
         @param quantity: int
         '''
         # From orderbook
+        self.id = id
         self.time: datetime.datetime.date | None = time
         self.client: None = client # replace with client
         self.instrument: None = instrument # replace with instrument
@@ -39,7 +41,7 @@ class Order:
         self.message: str = "Accept"
 
     def __str__(self):
-        return f"{self.instrument} {self.side} {self.quantity} @ {self.price}"
+        return f"{self.id} {self.instrument} {self.side} {self.quantity} @ {self.price}"
 
 
 class OrderBook:
@@ -58,28 +60,43 @@ class OrderBook:
         self.offers: Dict[int, list] = defaultdict(list)
 
         self.to_process = Queue()
-        self.trades = Queue()
+        self.trades = []
 
     @property
-    def max_bid(self) -> float:
+    def max_bid(self) -> float: # max amount people are willing to pay
         if self.bids:
             return max(self.bids.keys())
         else:
             return 0.0
         
     @property
-    def min_offer(self) -> float:
+    def min_bid(self) -> float:
+        if self.bids:
+            return min(self.bids.keys())
+        else:
+            return float('inf')
+        
+    @property
+    def min_offer(self) -> float: # min amount people are willing to sell
         if self.offers:
             return min(self.offers.keys())
         else:
             return float('inf') 
         
+    @property
+    def max_offer(self) -> float:
+        if self.offers:
+            return max(self.offers.keys())
+        else:
+            return 0.0
+        
+        
     def get_new_order_id(self) -> int:
         self.order_id += 1
         return self.order_id
     
-    def log(self, buyer, seller, price: float, size: int) -> str:
-        return f"{datetime.datetime.now()} EXECUTE: {buyer} BUY {seller} SELL {size} {self.instrument} @ {price}"
+    def log(self, incoming_order, book_order, price: float, size: int) -> str:
+        return f"{datetime.datetime.now()} EXECUTE: {incoming_order.client} #{incoming_order.id} BUY {book_order.client} #{book_order.id} SELL {size} {self.instrument} @ {price}"
         
     def process_order(self, incoming_order: Order) -> None:
         '''
@@ -88,8 +105,11 @@ class OrderBook:
         new_ts = incoming_order.time
         new_order_id = self.get_new_order_id()
 
-        if incoming_order.price is None:
-            return
+        if incoming_order.price is None: # Market order
+            if incoming_order.side: # BUY at highest sell price
+                incoming_order.price = self.max_offer
+            else: # SELL at lowest buy price
+                incoming_order.price = self.min_bid
 
         # TODO: Add checks (?)
 
@@ -103,7 +123,6 @@ class OrderBook:
                 self.process_match(incoming_order)
             else:
                 self.offers[incoming_order.price].append(incoming_order)
-
 
     def process_match(self, incoming_order: Order) -> None:
         '''
@@ -138,9 +157,9 @@ class OrderBook:
                 incoming_order.quantity -= trade_size
                 book_order.quantity -= trade_size
 
-                res: str = self.log(incoming_order.client, book_order.client, price, trade_size)
+                res: str = self.log(incoming_order, book_order, price, trade_size)
 
-                self.trades.put(res)
+                self.trades.append(res)
 
             levels[price] = [o for o in order_stack if o.quantity > 0]
 
@@ -170,41 +189,16 @@ class OrderBook:
         print('BUY')
         if len(bid_prices) == 0:
             print('NO BUYS')
-        for idx, price in enumerate(self.bid_prices):
+        for idx, price in list(enumerate(bid_prices)):
             print(f"{idx + 1} {price} {bid_sizes[idx]}")
 
         print()
 
         print("=== TRADES ===")
-        while not self.trades.empty():
-            t = self.trades.get()
-            print(t)
+        if len(self.trades) == 0:
+            print("NO TRADES")
+        else:
+            for trade in self.trades:
+                print(trade)
 
-
-def main() -> None:
-    ob = OrderBook("SIA")
-    orders: List[Order] = []
-
-    with open("csv//example//input_orders.csv") as inf:
-        csv_file = csv.DictReader(inf)
-
-        for line in csv_file:
-            new_order = Order(
-                time=datetime.datetime.now(), 
-                client=line["Client"],
-                instrument=line["Instrument"],
-                side=line["Side"] == "Buy",
-                price=line["Price"],
-                quantity=int(line["Quantity"])
-            )
-
-            orders.append(new_order)
-
-    for order in orders:
-        ob.process_order(order)
-
-    ob.show_book()
-
-
-if __name__ == '__main__':
-    main()
+    

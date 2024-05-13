@@ -1,7 +1,7 @@
 import os, logging, csv
-from order import Order
-from instrument import Instrument
-from errors import *
+from .order import Order
+from .instrument import Instrument
+from .errors import *
 
 
 inputClientPath = os.path.join('classes', 'csv', 'example', 'input_clients.csv')
@@ -38,6 +38,10 @@ class Client:
         }
         """
         self.positions: dict[str:dict[float:int]] = {}
+
+
+    def __str__(self):
+        return f"{self.ID}: Allowed: [{self.currencies}] PosCheck: {self.positionCheck} Rating {self.rating}"
 
     def checkOrder(self, order: Order):
 
