@@ -11,7 +11,16 @@ from queue import Queue
 
 # from client import Client
 # from instrument import Instrument
+class Trade:
+    def __init__(self, buyer, seller, price: float, volume: int) -> None:
+        self.buyer = buyer
+        self.seller = seller
+        self.time = datetime.datetime.now()
+        self.price = price
+        self.volume = volume
 
+    def __str__(self) -> str:
+        return f"{self.time} BUY {self.buyer.ID} SELL {self.seller.ID} {self.volume} @ {self.price}"
 
 class Order:
     def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int, rating: int) -> None:
@@ -73,7 +82,6 @@ class Order:
                 return self.price < obj.price
 
 
-
 class OrderBook:
     def __init__(self, instrument, start_id: int = 0, callback = None) -> None:
         self.instrument: None = instrument
@@ -91,6 +99,7 @@ class OrderBook:
 
         self.to_process = Queue()
         self.trades = []
+        self.log = []
         self.errors = []
 
     @property
@@ -113,7 +122,7 @@ class OrderBook:
             return min(self.offers.keys())
         else:
             return float('inf') 
-        
+    
     @property
     def max_offer(self) -> float:
         if self.offers:
@@ -121,11 +130,9 @@ class OrderBook:
         else:
             return 0.0
         
-        
     def get_new_order_id(self) -> int:
         self.order_id += 1
         return self.order_id
-    
     
     def generate_trade_log(self, incoming_order, book_order, price: float, size: int) -> str:
         return f"{datetime.datetime.now()} EXECUTE: {incoming_order.client} #{incoming_order.id} BUY {book_order.client} #{book_order.id} SELL {size} {self.instrument} @ {price}"
@@ -206,9 +213,18 @@ class OrderBook:
                 if trade_size == 0:
                     continue
 
+                self.trades.append(
+                    Trade(
+                        incoming_order.client,
+                        book_order.client,
+                        book_order.price,
+                        trade_size
+                    )
+                )
+
                 res: str = self.generate_trade_log(incoming_order, book_order, price, trade_size)
 
-                self.trades.append(res)
+                self.log.append(res)
 
             # Remove orders with quantity 0
             # print(order_pq)
@@ -255,12 +271,15 @@ class OrderBook:
         print()
 
         print("=== TRADES ===")
-        if len(self.trades) == 0:
+        if len(self.log) == 0:
             print("NO TRADES")
         else:
-            for trade in self.trades:
-                print(trade)
+            for log in self.log:
+                print(log)
             for error in self.errors:
                 print(error)
+
+            for trade in self.trades:
+                print(trade)
 
     
