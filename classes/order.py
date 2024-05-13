@@ -6,6 +6,7 @@ import heapq
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from queue import Queue
+from instrument import Instrument
 
 
 
@@ -88,19 +89,15 @@ class OrderBook:
         self.order_id = start_id
         self.callback = callback
 
-        self.bid_prices: List[float] = []
-        self.bid_sizes: List[int] = []
-
-        self.offer_prices: List[float] = []
-        self.offer_sizes: List[int] = []
-
         self.bids: Dict[int, list] = defaultdict(list)
         self.offers: Dict[int, list] = defaultdict(list)
 
-        self.to_process = Queue()
         self.trades = []
         self.log = []
         self.errors = []
+
+        self.pre_orders = []
+        self.post_orders = []
 
     @property
     def max_bid(self) -> float: # max amount people are willing to pay
@@ -129,6 +126,43 @@ class OrderBook:
             return max(self.offers.keys())
         else:
             return 0.0
+        
+    def calculate_auction_price(self, auction_orders: List[Order]) -> float | None:
+        bids = defaultdict(list)
+        offers = defaultdict(list)
+
+        for order in auction_orders:
+            rating = order.rating
+
+            if order.price is None: # Market order
+                if order.side: # BUY at highest sell price
+                    order.price = self.max_offer
+                else: # SELL at lowest buy price
+                    order.price = self.min_bid
+
+            if order.side: # BUY
+                bids[order.price].append(
+                    (rating, order)
+                )
+                heapq.heapify(self.bids[order.price])
+            else: # SELL
+                offers[order.price].append(
+                    (rating, order)
+                )
+                heapq.heapify(self.offers[order.price])
+
+        bid_prices = sorted(self.bids.keys(), reverse=True)
+        offer_prices = sorted(self.offers.keys())
+
+        bid_sizes = [sum(o[1].quantity for o in self.bids[p]) for p in bid_prices]
+        offer_sizes = [sum(o[1].quantity for o in self.offers[p]) for p in offer_prices]
+
+        print(bid_prices)
+        print(bid_sizes)
+
+        print(offer_prices)
+        print(offer_sizes)
+
         
     def get_new_order_id(self) -> int:
         self.order_id += 1
@@ -174,10 +208,20 @@ class OrderBook:
                         (rating, incoming_order)
                     )
                     heapq.heapify(self.offers[incoming_order.price])
-        except Exception as e:
-            self.errors.append([incoming_order.id, e])
 
-    def process_match(self, incoming_order: Order, rating: int) -> None:
+            # before start
+            if incoming_order.time < datetime.datetime.strptime("09:30:00", "%H:%M:%S"):
+                # print(incoming_order.time)
+                self.pre_orders.append(incoming_order)
+            # after end
+            elif incoming_order.time > datetime.datetime.strptime("16:00:00", "%H:%M:%S"):
+                # print(incoming_order.time)
+                self.post_orders.append(incoming_order)
+
+        except Exception as e:
+            self.errors.append(f"{incoming_order.id} {incoming_order.time} {e}")
+
+    def process_match(self, incoming_order: Order, rating: int, store_trade: bool = True) -> None:
         '''
         Matching algo, price-time (add rating later) priority
         '''
@@ -215,26 +259,29 @@ class OrderBook:
                 if trade_size == 0:
                     continue
 
-                self.trades.append(
-                    Trade(
-                        incoming_order.client,
-                        book_order.client,
-                        book_order.price,
-                        trade_size
+                Instrument.add_matching(incoming_order.instrument, book_order.price, trade_size)
+
+                if store_trade:
+                    self.trades.append(
+                        Trade(
+                            incoming_order.client,
+                            book_order.client,
+                            book_order.price,
+                            trade_size
+                        )
                     )
-                )
 
-                res: str = self.generate_trade_log(incoming_order, book_order, price, trade_size)
-                self.log.append(res)
+                    res: str = self.generate_trade_log(incoming_order, book_order, price, trade_size)
+                    self.log.append(res)
 
-                # if not is_sell:
-                #     incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, -trade_size)
+                    # if not is_sell:
+                    #     incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, -trade_size)
 
-                if incoming_order.side:
-                    incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, trade_size)
+                    if incoming_order.side:
+                        incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, trade_size)
 
-                if book_order.side:
-                    book_order.client.updatePosition(book_order.instrument, book_order.price, trade_size)
+                    if book_order.side:
+                        book_order.client.updatePosition(book_order.instrument, book_order.price, trade_size)
 
 
             # Remove orders with quantity 0

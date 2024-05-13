@@ -41,13 +41,19 @@ def main() -> None:
     # ]
 
     orders: List[Order] = []
-    # orders.extend(pre_orders)
+
+    sia_inst = Instrument("SIA", "SGD", 100)
+
+    # pre_orders = [
+    #     Order("C1", datetime.datetime.now(), clients['C'], sia_inst, True, 32.0, 100, clients['C'].rating),
+    #     Order("A2", datetime.datetime.now(), clients['A'], sia_inst, True, 31.9, 800, clients['A'].rating),
+    #     Order("B1", datetime.datetime.now(), clients['B'], sia_inst, False, 32.1, 4000, clients['B'].rating)
+    # ]
+
     # for order in pre_orders:
-    #     ob: OrderBook = orderbooks[order.instrument.instrumentID]
     #     ob.process_order(order, order.rating)
-    # FOR TESTING
 
-
+    # print(pre_orders)
 
     # ORDER INGESTION
 
@@ -59,7 +65,7 @@ def main() -> None:
 
             new_order = Order(
                 id=line['OrderID'],
-                time=datetime.datetime.now(),
+                time=datetime.datetime.strptime(line['Time'], "%H:%M:%S"), 
                 client=client,
                 instrument=instruments[line['Instrument']],
                 side=line["Side"] == "Buy",
@@ -75,8 +81,12 @@ def main() -> None:
         ob: OrderBook = orderbooks[order.instrument.instrumentID]
         ob.process_order(order, order.rating)
 
-    ob.show_book()
-    generateClientReport(clients.values())
+        # ob.calculate_auction_price(ob.pre_orders)
+        ob.calculate_auction_price(ob.post_orders)
+
+        # ob.show_book()
+        generateClientReport(clients.values())
+
 
 if __name__ == '__main__':
     main()

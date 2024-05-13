@@ -30,13 +30,12 @@ class Instrument:
         """
 
         fields = ['Instrument ID', 'OpenPrice', 'ClosePrice', 'TotalVolume', 'VWAP', 'DayHigh', 'DayLow']
+        
 
-        instrumentRows = []
+        total_price_volume = sum([price * volume for price, volume in self.matchings])
+        vwap = round(total_price_volume / self.total_traded_volume, 4) if self.total_traded_volume != 0 else 0
 
-        total_price_volume = sum([price * volume for price, volume in self.matchings]) # need jareds matching
-        vwap = round(total_price_volume / self.total_traded_volume, 4)
-
-        instrumentRows.push({
+        instrumentRows = [{
             'Instrument ID': self.instrumentID,
             'OpenPrice': self.open_price,
             'ClosePrice': self.closed_price,
@@ -44,13 +43,13 @@ class Instrument:
             'VWAP': vwap,
             'DayHigh': self.day_high,
             'DayLow': self.day_low
-        })
+        }]
 
         filename = "output_instrument_report.csv"
 
-        with open(filename, 'w') as csvfile:
+        with open(filename, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fields)
-    
-            writer.writeheader(fields)
+
+            writer.writeheader()
 
             writer.writerows(instrumentRows)
