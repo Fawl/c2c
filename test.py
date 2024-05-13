@@ -81,11 +81,15 @@ def main() -> None:
         ob: OrderBook = orderbooks[order.instrument.instrumentID]
         ob.process_order(order, order.rating)
 
-        ob.calculate_auction_price(ob.pre_orders)
+    open_price = ob.calculate_auction_price(ob.pre_orders)
+    close_price = ob.calculate_auction_price(ob.post_orders)
+
+    print(open_price)
+    print(close_price)
         # ob.calculate_auction_price(ob.post_orders)
 
         # ob.show_book()
-        generateClientReport(clients.values())
+        # generateClientReport(clients.values())
 
 
 if __name__ == '__main__':

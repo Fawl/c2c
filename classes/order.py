@@ -191,18 +191,16 @@ class OrderBook:
 
         bid_to_qty = dict(zip(bid_prices, bid_sizes))
         bid_with_most = max(bid_to_qty, key = lambda x: bid_to_qty[x])
-
-        print(bid_with_most)
+        bid_most_qty = bid_to_qty[bid_with_most]
 
         offer_to_qty = dict(zip(offer_prices, offer_sizes))
         sorted_offer_to_qty = {key : offer_to_qty[key] for key in sorted(offer_to_qty.keys())}
 
         for price, qty in sorted_offer_to_qty.items():
-            pass
+            bid_most_qty -= qty
 
-
-
-
+            if bid_most_qty <= 0:
+                return price
 
         
     def get_new_order_id(self) -> int:
