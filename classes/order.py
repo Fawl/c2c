@@ -26,7 +26,12 @@ class Order:
         self.client: None = client # replace with client
         self.instrument: None = instrument # replace with instrument
         self.side: bool = side # TRUE: buy, FALSE: sell
-        self.price: float | None = price # none: market, else price
+
+        if price == "Market":
+            self.price = None
+        else:
+            self.price = float(price)
+
         self.quantity: int | None = quantity
 
         # Result
@@ -35,30 +40,6 @@ class Order:
 
     def __str__(self):
         return f"{self.instrument} {self.side} {self.quantity} @ {self.price}"
-
-    @property
-    def side(self) -> bool:
-        return self.side
-    
-    @property
-    def price(self) -> float:
-        return self.price
-    
-    @property
-    def quantity(self) -> int:
-        return self.quantity
-    
-    @property
-    def client(self):
-        return self.client
-    
-    @property
-    def instrument(self):
-        return self.instrument
-    
-    @property
-    def time(self):
-        return self.time
 
 
 class OrderBook:
@@ -98,7 +79,7 @@ class OrderBook:
         return self.order_id
     
     def log(self, buyer, seller, price: float, size: int) -> str:
-        return f"{datetime.datetime.now()} EXECUTE: {buyer} BUY {seller} SELL {size} {self.__instrument} @ {price}"
+        return f"{datetime.datetime.now()} EXECUTE: {buyer} BUY {seller} SELL {size} {self.instrument} @ {price}"
         
     def process_order(self, incoming_order: Order) -> None:
         '''
@@ -106,6 +87,9 @@ class OrderBook:
         '''
         new_ts = incoming_order.time
         new_order_id = self.get_new_order_id()
+
+        if incoming_order.price is None:
+            return
 
         # TODO: Add checks (?)
 
@@ -144,10 +128,12 @@ class OrderBook:
             order_stack: List[Order] = levels[price]
 
             for order_idx, book_order in enumerate(order_stack):
-                incoming_qty: int = min(0, incoming_order.quantity) # guaranteed > 0 ?
-                book_qty: int = min(0, book_order.quantity)
+                incoming_qty: int = max(0, incoming_order.quantity) # guaranteed > 0 ?
+                book_qty: int = max(0, book_order.quantity)
 
                 trade_size: int = min(incoming_qty, book_qty)
+
+                # print(f"INC: {incoming_qty} BOOK: {book_qty} SIZE {trade_size}")
 
                 incoming_order.quantity -= trade_size
                 book_order.quantity -= trade_size
@@ -158,23 +144,66 @@ class OrderBook:
 
             levels[price] = [o for o in order_stack if o.quantity > 0]
 
-            if len(levels[price] == 0): # no more orders at price
+            if len(levels[price]) == 0: # no more orders at price
                 levels.pop(price)
 
         if incoming_order.quantity > 0:
             orders_at_side = self.offers if is_sell else self.bids
             orders_at_side[incoming_order.price].append(incoming_order)
 
+    def show_book(self):
+        bid_prices = sorted(self.bids.keys(), reverse=True)
+        offer_prices = sorted(self.offers.keys())
+
+        bid_sizes = [sum(o.quantity for o in self.bids[p]) for p in bid_prices]
+        offer_sizes = [sum(o.quantity for o in self.offers[p]) for p in offer_prices]
+
+        print()
+        print("=== BOOK ===")
+
+        print('SELL')
+        if len(offer_prices) == 0:
+            print('NO SELLS')
+        for idx, price in reversed(list(enumerate(offer_prices))):
+            print(f"{idx + 1} {price} {offer_sizes[idx]}")
+
+        print('BUY')
+        if len(bid_prices) == 0:
+            print('NO BUYS')
+        for idx, price in enumerate(self.bid_prices):
+            print(f"{idx + 1} {price} {bid_sizes[idx]}")
+
+        print()
+
+        print("=== TRADES ===")
+        while not self.trades.empty():
+            t = self.trades.get()
+            print(t)
 
 
 def main() -> None:
-    # ob = OrderBook()
+    ob = OrderBook("SIA")
+    orders: List[Order] = []
 
     with open("csv//example//input_orders.csv") as inf:
         csv_file = csv.DictReader(inf)
 
         for line in csv_file:
-            print(line)
+            new_order = Order(
+                time=datetime.datetime.now(), 
+                client=line["Client"],
+                instrument=line["Instrument"],
+                side=line["Side"] == "Buy",
+                price=line["Price"],
+                quantity=int(line["Quantity"])
+            )
+
+            orders.append(new_order)
+
+    for order in orders:
+        ob.process_order(order)
+
+    ob.show_book()
 
 
 if __name__ == '__main__':
