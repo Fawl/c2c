@@ -11,7 +11,7 @@ from queue import Queue
 
 
 class Order:
-    def __init__(self, time: datetime.datetime.Date, client, instrument, side: bool, price: float | None, quantity: int) -> None:
+    def __init__(self, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int) -> None:
         '''
         Class representing a single order
         @param time: datetime
@@ -97,7 +97,7 @@ class OrderBook:
         self.order_id += 1
         return self.order_id
     
-    def execute(self, buyer, seller, price: float, size: int) -> str:
+    def log(self, buyer, seller, price: float, size: int) -> str:
         return f"{datetime.datetime.now()} EXECUTE: {buyer} BUY {seller} SELL {size} {self.__instrument} @ {price}"
         
     def process_order(self, incoming_order: Order) -> None:
@@ -149,7 +149,10 @@ class OrderBook:
 
                 trade_size: int = min(incoming_qty, book_qty)
 
-                res: str = self.execute(incoming_order.client, book_order.client, price, trade_size)
+                incoming_order.quantity -= trade_size
+                book_order.quantity -= trade_size
+
+                res: str = self.log(incoming_order.client, book_order.client, price, trade_size)
 
                 self.trades.put(res)
 
@@ -162,3 +165,17 @@ class OrderBook:
             orders_at_side = self.offers if is_sell else self.bids
             orders_at_side[incoming_order.price].append(incoming_order)
 
+
+
+def main() -> None:
+    # ob = OrderBook()
+
+    with open("csv//example//input_orders.csv") as inf:
+        csv_file = csv.DictReader(inf)
+
+        for line in csv_file:
+            print(line)
+
+
+if __name__ == '__main__':
+    main()
