@@ -1,6 +1,6 @@
 from classes.client import Client, generateClientReport
 from classes.order import Order, OrderBook
-from classes.instrument import Instrument
+from classes.instrument import Instrument, generate_instrument_report
 
 from typing import List
 
@@ -86,6 +86,7 @@ def main() -> None:
 
         # ob.show_book()
         generateClientReport(clients.values())
+        generate_instrument_report(instruments.values())
 
 
 if __name__ == '__main__':

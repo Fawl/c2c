@@ -157,11 +157,11 @@ class OrderBook:
         bid_sizes = [sum(o[1].quantity for o in self.bids[p]) for p in bid_prices]
         offer_sizes = [sum(o[1].quantity for o in self.offers[p]) for p in offer_prices]
 
-        print(bid_prices)
-        print(bid_sizes)
+        # print(bid_prices)
+        # print(bid_sizes)
 
-        print(offer_prices)
-        print(offer_sizes)
+        # print(offer_prices)
+        # print(offer_sizes)
 
         
     def get_new_order_id(self) -> int:
@@ -259,7 +259,7 @@ class OrderBook:
                 if trade_size == 0:
                     continue
 
-                Instrument.add_matching(incoming_order.instrument, book_order.price, trade_size)
+                Instrument.add_matching(incoming_order.instrument, incoming_order.price, trade_size)
 
                 if store_trade:
                     self.trades.append(

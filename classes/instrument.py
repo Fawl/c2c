@@ -1,4 +1,4 @@
-import csv
+import csv, os
 
 class Instrument:
 
@@ -23,33 +23,30 @@ class Instrument:
             self.open_price = price
         self.day_high = max(self.day_high, price) if self.day_high is not None else price
         self.day_low = min(self.day_low, price) if self.day_low is not None else price
+    
+def generate_instrument_report(instruments: list[Instrument]):
+    """
+    Generate instrument report
+    """
+    instrumentRows = []
 
-    def generate_report(self):
-        """
-        Generate instrument report
-        """
+    for instrument in instruments:
+        total_price_volume = sum([price * volume for price, volume in instrument.matchings])
+        vwap = round(total_price_volume / instrument.total_traded_volume, 4) if instrument.total_traded_volume != 0 else 0
 
-        fields = ['Instrument ID', 'OpenPrice', 'ClosePrice', 'TotalVolume', 'VWAP', 'DayHigh', 'DayLow']
-        
-
-        total_price_volume = sum([price * volume for price, volume in self.matchings])
-        vwap = round(total_price_volume / self.total_traded_volume, 4) if self.total_traded_volume != 0 else 0
-
-        instrumentRows = [{
-            'Instrument ID': self.instrumentID,
-            'OpenPrice': self.open_price,
-            'ClosePrice': self.closed_price,
-            'TotalVolume': self.total_traded_volume,
+        instrumentRows.append({
+            'Instrument ID': instrument.instrumentID,
+            'OpenPrice': instrument.open_price,
+            'ClosePrice': instrument.closed_price,
+            'TotalVolume': instrument.total_traded_volume,
             'VWAP': vwap,
-            'DayHigh': self.day_high,
-            'DayLow': self.day_low
-        }]
+            'DayHigh': instrument.day_high,
+            'DayLow': instrument.day_low
+        })
+    outputInstrumentPath = os.path.join('reports', 'output_instrument_report.csv')
 
-        filename = "output_instrument_report.csv"
-
-        with open(filename, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fields)
-
-            writer.writeheader()
-
-            writer.writerows(instrumentRows)
+    with open(outputInstrumentPath, 'w', newline='') as csvfile:
+        fields = ['Instrument ID', 'OpenPrice', 'ClosePrice', 'TotalVolume', 'VWAP', 'DayHigh', 'DayLow']
+        writer = csv.DictWriter(csvfile, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(instrumentRows)
