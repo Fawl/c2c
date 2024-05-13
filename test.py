@@ -81,8 +81,8 @@ def main() -> None:
         ob: OrderBook = orderbooks[order.instrument.instrumentID]
         ob.process_order(order, order.rating)
 
-        # ob.calculate_auction_price(ob.pre_orders)
-        ob.calculate_auction_price(ob.post_orders)
+        ob.calculate_auction_price(ob.pre_orders)
+        # ob.calculate_auction_price(ob.post_orders)
 
         # ob.show_book()
         generateClientReport(clients.values())

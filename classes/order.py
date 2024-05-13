@@ -2,10 +2,12 @@ import csv
 import datetime
 import os
 import heapq
+import copy
 
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from queue import Queue
+
 from .instrument import Instrument
 
 
@@ -111,7 +113,7 @@ class OrderBook:
         if self.bids:
             return min(self.bids.keys())
         else:
-            return float('inf')
+            return None
         
     @property
     def min_offer(self) -> float: # min amount people are willing to sell
@@ -125,43 +127,82 @@ class OrderBook:
         if self.offers:
             return max(self.offers.keys())
         else:
-            return 0.0
+            return None
         
     def calculate_auction_price(self, auction_orders: List[Order]) -> float | None:
         bids = defaultdict(list)
         offers = defaultdict(list)
 
         for order in auction_orders:
+            # print(order)
             rating = order.rating
-
-            if order.price is None: # Market order
-                if order.side: # BUY at highest sell price
-                    order.price = self.max_offer
-                else: # SELL at lowest buy price
-                    order.price = self.min_bid
 
             if order.side: # BUY
                 bids[order.price].append(
                     (rating, order)
                 )
-                heapq.heapify(self.bids[order.price])
+                heapq.heapify(bids[order.price])
             else: # SELL
                 offers[order.price].append(
                     (rating, order)
                 )
-                heapq.heapify(self.offers[order.price])
+                heapq.heapify(offers[order.price])
 
-        bid_prices = sorted(self.bids.keys(), reverse=True)
-        offer_prices = sorted(self.offers.keys())
+        # get max offer
+        # get min bid
 
-        bid_sizes = [sum(o[1].quantity for o in self.bids[p]) for p in bid_prices]
-        offer_sizes = [sum(o[1].quantity for o in self.offers[p]) for p in offer_prices]
+        max_offer = 0.0
+        min_bid = 100000000.0
 
-        print(bid_prices)
-        print(bid_sizes)
+        for bid in bids:
+            if bid is not None and min_bid > bid:
+                min_bid = bid
 
-        print(offer_prices)
-        print(offer_sizes)
+        for offer in offers:
+            if offer is not None and max_offer < offer:
+                max_offer = offer
+
+        # print(min_bid)
+        # print(max_offer)
+
+        market_bid = bids[None]
+        bids.pop(None)
+        bids[max_offer] = market_bid
+
+        market_offer = offers[None]
+        offers.pop(None)
+        offers[min_bid] = market_offer
+
+        bid_prices = sorted(bids.keys(), reverse=True)
+        offer_prices = sorted(offers.keys())
+
+        # print(offer_prices)
+
+        bid_sizes = [sum(o[1].quantity for o in bids[p]) for p in bid_prices]
+        offer_sizes = [sum(o[1].quantity for o in offers[p]) for p in offer_prices]
+
+        # for bid 
+
+        # print(bid_prices)
+        # print(bid_sizes)
+
+        # print(offer_prices)
+        # print(offer_sizes)
+
+        bid_to_qty = dict(zip(bid_prices, bid_sizes))
+        bid_with_most = max(bid_to_qty, key = lambda x: bid_to_qty[x])
+
+        print(bid_with_most)
+
+        offer_to_qty = dict(zip(offer_prices, offer_sizes))
+        sorted_offer_to_qty = {key : offer_to_qty[key] for key in sorted(offer_to_qty.keys())}
+
+        for price, qty in sorted_offer_to_qty.items():
+            pass
+
+
+
+
 
         
     def get_new_order_id(self) -> int:
@@ -190,6 +231,16 @@ class OrderBook:
         try:
             order_client.checkOrder(incoming_order)
 
+            # before start
+            if incoming_order.time <= datetime.datetime.strptime("09:30:00", "%H:%M:%S"):
+                # print(incoming_order.time)
+                # print(incoming_order)
+                self.pre_orders.append(copy.deepcopy(incoming_order))
+            # after end
+            elif incoming_order.time >= datetime.datetime.strptime("16:00:00", "%H:%M:%S"):
+                # print(incoming_order.time)
+                self.post_orders.append(copy.deepcopy(incoming_order))
+
             if incoming_order.side: # BUY
                 if incoming_order.price >= self.min_offer and self.offers:
                     self.process_match(incoming_order, rating)
@@ -208,15 +259,6 @@ class OrderBook:
                         (rating, incoming_order)
                     )
                     heapq.heapify(self.offers[incoming_order.price])
-
-            # before start
-            if incoming_order.time < datetime.datetime.strptime("09:30:00", "%H:%M:%S"):
-                # print(incoming_order.time)
-                self.pre_orders.append(incoming_order)
-            # after end
-            elif incoming_order.time > datetime.datetime.strptime("16:00:00", "%H:%M:%S"):
-                # print(incoming_order.time)
-                self.post_orders.append(incoming_order)
 
         except Exception as e:
             self.errors.append(f"{incoming_order.id} {incoming_order.time} {e}")
