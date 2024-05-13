@@ -6,7 +6,7 @@ import heapq
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from queue import Queue
-from instrument import Instrument
+from .instrument import Instrument
 
 
 
