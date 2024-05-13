@@ -183,8 +183,8 @@ class OrderBook:
 
         # for bid 
 
-        # print(bid_prices)
-        # print(bid_sizes)
+        # # print(bid_prices)
+        # # print(bid_sizes)
 
         # print(offer_prices)
         # print(offer_sizes)
@@ -299,7 +299,7 @@ class OrderBook:
                 if trade_size == 0:
                     continue
 
-                Instrument.add_matching(incoming_order.instrument, book_order.price, trade_size)
+                Instrument.add_matching(incoming_order.instrument, incoming_order.price, trade_size)
 
                 if store_trade:
                     self.trades.append(
