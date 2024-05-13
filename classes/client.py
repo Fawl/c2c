@@ -8,7 +8,7 @@ inputClientPath = os.path.join('classes', 'csv', 'example', 'input_clients.csv')
 outputClientPath = os.path.join('reports', 'output_client_report.csv')
 data = csv.DictReader(open(inputClientPath))
 global INSTRUMENTS
-INSTRUMENTS = set('SIA', 'AMD')
+INSTRUMENTS = set(['SIA', 'AMD'])
 
 class Client:
 
@@ -37,11 +37,11 @@ class Client:
             ...
         }
         """
-        self.positions: dict[Instrument:dict[float:int]] = {}
+        self.positions: dict[str:dict[float:int]] = {}
 
     def checkOrder(self, order: Order):
 
-        if order.Instrument not in INSTRUMENTS:
+        if order.instrument.instrumentID not in Instrument.INSTRUMENTS:
             raise InstrumentNotFound()
 
         if order.instrument.currency not in self.currencies:
@@ -50,7 +50,7 @@ class Client:
         if order.quantity % order.instrument.lotSize != 0:
             raise InvalidSize()
 
-        if sum(self.positions[order.instrument].values()) < order.quantity:
+        if not order.side and order.instrument.instrumentID in self.positions and sum(self.positions[order.instrument.instrumentID].values()) < order.quantity:
             raise PositionCheck()
 
         return True
@@ -61,13 +61,13 @@ class Client:
         Updates a client's position based on order. Returns position held by client for that particular instrument.
         """
 
-        if order.instrument in self.positions:
-            self.positions[order.instrument][order.price] = order.qty + self.positions[order.instrument].setdefault(order.price, 0)
+        if order.instrument.instrumentID in self.positions:
+            self.positions[order.instrument.instrumentID][order.price] = order.qty + self.positions[order.instrument.instrumentID].setdefault(order.price, 0)
 
         else:
-            self.positions[order.instrument] = {order.price : order.qty}
+            self.positions[order.instrument.instrumentID] = {order.price : order.qty}
         
-        return self.positions[order.instrument]
+        return self.positions[order.instrument.instrumentID]
 
 
     def generateReportRows(self) -> list[dict[str:str|int]]:
@@ -118,3 +118,22 @@ if __name__ == "__main__":
         # now dump this in some way or another
         logging.debug(', '.join("%s: %s" % item for item in attrs.items()))
 
+
+
+def generateClientReport(clients: list[Client]):
+
+    with open(outputClientPath) as report:
+        
+        fieldnames = ['ClientID', 'InstrumentID', 'NetPosition']
+        writer = csv.DictWriter(report, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for c in clients:
+            try: 
+                logging.info(f"Writing for client {c.ID}...")
+                writer.writerows(c.generateReportRows())
+            except Exception as e:
+                logging.error(f"Error occured when writing: {e}")
+
+    logging.info('Completed report.')
+    return

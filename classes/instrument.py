@@ -1,6 +1,6 @@
-import csv
-
 class Instrument:
+
+    INSTRUMENTS = set()
 
     def __init__(self, instrumentID, currency, lotSize) -> None:
         self.instrumentID = instrumentID
@@ -12,6 +12,7 @@ class Instrument:
         self.day_high = None
         self.day_low = None
         self.matchings = []
+        Instrument.INSTRUMENTS.add(instrumentID)
 
     def get_instrument_currency(self):
         return self.currency
