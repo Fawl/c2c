@@ -1,7 +1,7 @@
 import csv
 import datetime
 import os
-import heapq
+import heapq, logging
 import copy
 
 from typing import Dict, List, Tuple
@@ -259,7 +259,7 @@ class OrderBook:
                     heapq.heapify(self.offers[incoming_order.price])
 
         except Exception as e:
-            self.errors.append(f"{incoming_order.id} {incoming_order.time} {e}")
+            self.errors.append(f"{incoming_order.id}|{incoming_order.time}|{e}")
 
     def process_match(self, incoming_order: Order, rating: int, store_trade: bool = True) -> None:
         '''
@@ -377,4 +377,28 @@ class OrderBook:
             # for trade in self.trades:
             #     print(trade)
 
-    
+outputReportPath = os.path.join('reports', 'output_exchange_report.csv')
+
+def generateExchangeReport(exchanges:list[OrderBook]):
+    with open(outputReportPath, 'w') as report:
+        
+        fieldnames = ['OrderID', 'RejectionReason']
+        writer = csv.DictWriter(report, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for exchange in exchanges:
+            try: 
+                rows = []
+                for error in exchange.errors:
+                    stuffs = error.split('|')
+                    if 'REJECTED' in stuffs[2]:
+                        rows.append({
+                            'OrderID' : stuffs[0],
+                            'RejectionReason' : stuffs[2]
+                        })
+                writer.writerows(rows)
+            except Exception as e:
+                logging.error(f"Error occured when writing: {e}")
+
+    logging.info('Completed report.')
+    return

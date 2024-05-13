@@ -55,7 +55,7 @@ class Client:
         if order.quantity % order.instrument.lotSize != 0:
             raise InvalidSize("REJECTED - INVALID LOT SIZE")
 
-        if not order.side and order.instrument.instrumentID in self.positions and sum(self.positions[order.instrument.instrumentID].values()) < order.quantity:
+        if not order.side and self.positionCheck and order.instrument.instrumentID in self.positions and sum(self.positions[order.instrument.instrumentID].values()) < order.quantity:
             raise PositionCheck("REJECTED - POSITION CHECK FAILED")
 
         return True

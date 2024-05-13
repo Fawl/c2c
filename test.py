@@ -1,5 +1,5 @@
 from classes.client import Client, generateClientReport
-from classes.order import Order, OrderBook
+from classes.order import Order, OrderBook, generateExchangeReport
 from classes.instrument import Instrument, generate_instrument_report
 
 from typing import List
@@ -89,8 +89,9 @@ def main() -> None:
         # ob.calculate_auction_price(ob.post_orders)
 
         # ob.show_book()
-        generateClientReport(clients.values())
-        generate_instrument_report(instruments.values())
+    generateClientReport(clients.values())
+    generate_instrument_report(instruments.values())
+    generateExchangeReport(orderbooks.values())
 
 
 if __name__ == '__main__':
