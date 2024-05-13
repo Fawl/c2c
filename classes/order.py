@@ -6,6 +6,7 @@ import heapq
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from queue import Queue
+from instrument import Instrument
 
 
 
@@ -172,6 +173,9 @@ class OrderBook:
                         (rating, incoming_order)
                     )
                     heapq.heapify(self.offers[incoming_order.price])
+            
+            
+        
         except Exception as e:
             self.errors.append(e)
 
@@ -212,6 +216,8 @@ class OrderBook:
 
                 if trade_size == 0:
                     continue
+
+                Instrument.add_matching(incoming_order.instrument, book_order.price, trade_size)
 
                 self.trades.append(
                     Trade(
