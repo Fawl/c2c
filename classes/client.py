@@ -61,18 +61,18 @@ class Client:
         return True
 
 
-    def updatePosition(self, order: Order) -> dict[float:int]:
+    def updatePosition(self, instrument: Instrument, price: float, qty: int) -> dict[float:int]:
         """
         Updates a client's position based on order. Returns position held by client for that particular instrument.
         """
 
-        if order.instrument.instrumentID in self.positions:
-            self.positions[order.instrument.instrumentID][order.price] = order.qty + self.positions[order.instrument.instrumentID].setdefault(order.price, 0)
+        if instrument.instrumentID in self.positions:
+            self.positions[instrument.instrumentID][price] = qty + self.positions[instrument.instrumentID].setdefault(price, 0)
 
         else:
-            self.positions[order.instrument.instrumentID] = {order.price : order.qty}
+            self.positions[instrument.instrumentID] = {price : qty}
         
-        return self.positions[order.instrument.instrumentID]
+        return self.positions[instrument.instrumentID]
 
 
     def generateReportRows(self) -> list[dict[str:str|int]]:
@@ -104,9 +104,7 @@ class Client:
         return clientRows
 
 
-
-if __name__ == "__main__":
-
+def main():
     test = []
     for row in data:
         newclient = Client(
@@ -123,11 +121,13 @@ if __name__ == "__main__":
         # now dump this in some way or another
         logging.debug(', '.join("%s: %s" % item for item in attrs.items()))
 
+if __name__ == "__main__":
+    main()
 
 
 def generateClientReport(clients: list[Client]):
 
-    with open(outputClientPath) as report:
+    with open(outputClientPath, 'w') as report:
         
         fieldnames = ['ClientID', 'InstrumentID', 'NetPosition']
         writer = csv.DictWriter(report, fieldnames=fieldnames)

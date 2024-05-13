@@ -1,24 +1,20 @@
+import csv
+
 class Instrument:
 
     INSTRUMENTS = set()
 
-    def __init__(self, instrumentID, currency, lotSize) -> None:
+    def __init__(self, instrumentID: str, currency: str, lotSize: int) -> None:
         self.instrumentID = instrumentID
         self.currency = currency
         self.lotSize = lotSize
-        self.open_price = None
-        self.closed_price = None
-        self.total_traded_volume = 0
-        self.day_high = None
-        self.day_low = None
-        self.matchings = []
+        self.open_price : float = None
+        self.closed_price : float = None
+        self.total_traded_volume : int = 0
+        self.day_high : float = None
+        self.day_low : float = None
+        self.matchings : list = []
         Instrument.INSTRUMENTS.add(instrumentID)
-
-    def get_instrument_currency(self):
-        return self.currency
-
-    def get_lotSize(self):
-        return self.lotSize
 
     def add_matching(self, price, volume):
         self.matchings.append((price, volume))

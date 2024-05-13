@@ -23,7 +23,7 @@ class Trade:
         return f"{self.time} BUY {self.buyer.ID} SELL {self.seller.ID} {self.volume} @ {self.price}"
 
 class Order:
-    def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int, rating: int) -> None:
+    def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: float, rating: int) -> None:
         '''
         Class representing a single order
         @param time: datetime
@@ -36,8 +36,8 @@ class Order:
         # From orderbook
         self.id = id
         self.time: datetime.datetime.date | None = time
-        self.client: None = client # replace with client
-        self.instrument: None = instrument # replace with instrument
+        self.client = client # replace with client
+        self.instrument = instrument # replace with instrument
         self.side: bool = side # TRUE: buy, FALSE: sell
         self.rating: int = rating
 
@@ -134,7 +134,8 @@ class OrderBook:
         self.order_id += 1
         return self.order_id
     
-    def generate_trade_log(self, incoming_order, book_order, price: float, size: int) -> str:
+    
+    def generate_trade_log(self, incoming_order: Order, book_order, price: float, size: int) -> str:
         return f"{datetime.datetime.now()} EXECUTE: {incoming_order.client} #{incoming_order.id} BUY {book_order.client} #{book_order.id} SELL {size} {self.instrument} @ {price}"
         
     def process_order(self, incoming_order: Order, rating: int) -> None:
@@ -150,7 +151,6 @@ class OrderBook:
             else: # SELL at lowest buy price
                 incoming_order.price = self.min_bid
 
-        # TODO: Add checks (?)
         order_client = incoming_order.client
 
         try:
@@ -165,6 +165,8 @@ class OrderBook:
                     )
                     heapq.heapify(self.bids[incoming_order.price])
             else: # SELL
+                incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, -incoming_order.quantity)
+
                 if incoming_order.price <= self.max_bid and self.bids:
                     self.process_match(incoming_order, rating)
                 else:
@@ -173,7 +175,7 @@ class OrderBook:
                     )
                     heapq.heapify(self.offers[incoming_order.price])
         except Exception as e:
-            self.errors.append(e)
+            self.errors.append([incoming_order.id, e])
 
     def process_match(self, incoming_order: Order, rating: int) -> None:
         '''
@@ -223,12 +225,19 @@ class OrderBook:
                 )
 
                 res: str = self.generate_trade_log(incoming_order, book_order, price, trade_size)
-
                 self.log.append(res)
 
-            # Remove orders with quantity 0
-            # print(order_pq)
+                # if not is_sell:
+                #     incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, -trade_size)
 
+                if incoming_order.side:
+                    incoming_order.client.updatePosition(incoming_order.instrument, incoming_order.price, trade_size)
+
+                if book_order.side:
+                    book_order.client.updatePosition(book_order.instrument, book_order.price, trade_size)
+
+
+            # Remove orders with quantity 0
             levels[price] = [o for o in levels[price] if o[1].quantity > 0]
 
             # for order_w_rating in levels[price]:
@@ -239,8 +248,6 @@ class OrderBook:
 
             if len(levels[price]) == 0: # no more orders at price
                 levels.pop(price)
-
-            # self.show_book()
 
         if incoming_order.quantity > 0:
             orders_at_side = self.offers if is_sell else self.bids
@@ -276,10 +283,11 @@ class OrderBook:
         else:
             for log in self.log:
                 print(log)
+
             for error in self.errors:
                 print(error)
 
-            for trade in self.trades:
-                print(trade)
+            # for trade in self.trades:
+            #     print(trade)
 
     

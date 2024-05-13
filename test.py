@@ -1,4 +1,4 @@
-from classes.client import Client
+from classes.client import Client, generateClientReport
 from classes.order import Order, OrderBook
 from classes.instrument import Instrument
 
@@ -9,11 +9,22 @@ import csv
 import datetime
 
 def main() -> None:
-    inputClientPath = os.path.join('classes', 'csv', 'example', 'input_clients.csv')
-    data = csv.DictReader(open(inputClientPath))
+    inputClientPath = os.path.join('classes', 'csv', 'test', 'input_clients.csv')
+    inputInstrumentPath = os.path.join('classes', 'csv', 'test', 'input_instruments.csv')
+    inputOrderPath = os.path.join('classes', 'csv', 'test', 'input_orders.csv')
+    clientData = csv.DictReader(open(inputClientPath))
+    instrumentData = csv.DictReader(open(inputInstrumentPath))
     clients = {}
+    instruments = {}
+    orderbooks = {}
 
-    for row in data:
+    # INSTRUMENT INGESTION
+    for instrument in instrumentData:
+        instruments[instrument['InstrumentID']] = Instrument(instrument['InstrumentID'], instrument['Currency'], int(instrument['LotSize']))
+        orderbooks[instrument['InstrumentID']] = OrderBook(instrument['InstrumentID'])
+
+    # CLIENT INGESTION
+    for row in clientData:
         newclient = Client(
                     ID= row['ClientID'],
                     currencies= set(row['Currencies'].split(',')),
@@ -22,28 +33,25 @@ def main() -> None:
                 )
         clients[row['ClientID']] = newclient
 
-    # for id, client in clients.items():
-    #     print(id, client)
+    # FOR TESTING 
+    # pre_orders = [
+    #     Order("C1", datetime.datetime.now(), clients['C'], instruments['SIA'], True, 32.0, 100, clients['C'].rating),
+    #     Order("A2", datetime.datetime.now(), clients['A'], instruments['SIA'], True, 31.9, 800, clients['A'].rating),
+    #     Order("B1", datetime.datetime.now(), clients['B'], instruments['SIA'], False, 32.1, 4000, clients['B'].rating)
+    # ]
 
-    ob = OrderBook("SIA")
     orders: List[Order] = []
+    # orders.extend(pre_orders)
+    # for order in pre_orders:
+    #     ob: OrderBook = orderbooks[order.instrument.instrumentID]
+    #     ob.process_order(order, order.rating)
+    # FOR TESTING
 
-    sia_inst = Instrument("SIA", "SGD", 100)
 
-    pre_orders = [
-        Order("C1", datetime.datetime.now(), clients['C'], sia_inst, True, 32.0, 100, clients['C'].rating),
-        Order("A2", datetime.datetime.now(), clients['A'], sia_inst, True, 31.9, 800, clients['A'].rating),
-        Order("B1", datetime.datetime.now(), clients['B'], sia_inst, False, 32.1, 4000, clients['B'].rating)
-    ]
 
-    for order in pre_orders:
-        ob.process_order(order, order.rating)
+    # ORDER INGESTION
 
-    # print(pre_orders)
-
-    # ob.show_book()
-
-    with open("classes//csv//example//input_orders.csv") as inf:
+    with open(inputOrderPath) as inf:
         csv_file = csv.DictReader(inf)
 
         for line in csv_file:
@@ -51,24 +59,24 @@ def main() -> None:
 
             new_order = Order(
                 id=line['OrderID'],
-                time=datetime.datetime.now(), 
+                time=datetime.datetime.now(),
                 client=client,
-                instrument=sia_inst,
+                instrument=instruments[line['Instrument']],
                 side=line["Side"] == "Buy",
                 price=line["Price"],
-                quantity=int(line["Quantity"]),
+                quantity=float(line["Quantity"]),
                 rating=client.rating
             )
 
-            # if client.checkOrder(new_order):
             orders.append(new_order)
 
-        # print(orders)
-        for order in orders:
-            ob.process_order(order, order.rating)
+    # ORDER PROCESSING
+    for order in orders:
+        ob: OrderBook = orderbooks[order.instrument.instrumentID]
+        ob.process_order(order, order.rating)
 
-        ob.show_book()
-
+    ob.show_book()
+    generateClientReport(clients.values())
 
 if __name__ == '__main__':
     main()
