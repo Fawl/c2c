@@ -41,21 +41,22 @@ class Client:
 
 
     def __str__(self):
-        return f"{self.ID}: Allowed: [{self.currencies}] PosCheck: {self.positionCheck} Rating {self.rating}"
+        # return f"{self.ID}: Allowed: [{self.currencies}] PosCheck: {self.positionCheck} Rating {self.rating}"
+        return self.ID
 
     def checkOrder(self, order: Order):
 
         if order.instrument.instrumentID not in Instrument.INSTRUMENTS:
-            raise InstrumentNotFound()
+            raise InstrumentNotFound("REJECTED - INSTRUMENT NOT FOUND")
 
         if order.instrument.currency not in self.currencies:
-            raise MismatchCurrency()
+            raise MismatchCurrency("REJECTED - MISMATCH CURRENCY")
 
         if order.quantity % order.instrument.lotSize != 0:
-            raise InvalidSize()
+            raise InvalidSize("REJECTED - INVALID LOT SIZE")
 
         if not order.side and order.instrument.instrumentID in self.positions and sum(self.positions[order.instrument.instrumentID].values()) < order.quantity:
-            raise PositionCheck()
+            raise PositionCheck("REJECTED - POSITION CHECK FAILED")
 
         return True
 

@@ -22,8 +22,8 @@ def main() -> None:
                 )
         clients[row['ClientID']] = newclient
 
-    for id, client in clients.items():
-        print(id, client)
+    # for id, client in clients.items():
+    #     print(id, client)
 
     ob = OrderBook("SIA")
     orders: List[Order] = []
@@ -31,17 +31,19 @@ def main() -> None:
     sia_inst = Instrument("SIA", "SGD", 100)
 
     pre_orders = [
-        Order("C1", "abcd", "C", "SIA", True, 32.0, 100),
-        Order("A2", "abcd", "A", "SIA", True, 31.9, 800),
-        Order("B1", "abcd", "B", "SIA", False, 32.1, 4000)
+        Order("C1", datetime.datetime.now(), clients['C'], sia_inst, True, 32.0, 100, clients['C'].rating),
+        Order("A2", datetime.datetime.now(), clients['A'], sia_inst, True, 31.9, 800, clients['A'].rating),
+        Order("B1", datetime.datetime.now(), clients['B'], sia_inst, False, 32.1, 4000, clients['B'].rating)
     ]
 
     for order in pre_orders:
-        ob.process_order(order)
+        ob.process_order(order, order.rating)
+
+    # print(pre_orders)
 
     # ob.show_book()
 
-    with open("classes//csv//example//input_orders_test.csv") as inf:
+    with open("classes//csv//example//input_orders.csv") as inf:
         csv_file = csv.DictReader(inf)
 
         for line in csv_file:
@@ -50,18 +52,20 @@ def main() -> None:
             new_order = Order(
                 id=line['OrderID'],
                 time=datetime.datetime.now(), 
-                client=line['Client'],
+                client=client,
                 instrument=sia_inst,
                 side=line["Side"] == "Buy",
                 price=line["Price"],
-                quantity=int(line["Quantity"])
+                quantity=int(line["Quantity"]),
+                rating=client.rating
             )
 
-            if client.checkOrder(new_order):
-                orders.append(new_order)
+            # if client.checkOrder(new_order):
+            orders.append(new_order)
 
+        # print(orders)
         for order in orders:
-            ob.process_order(order)
+            ob.process_order(order, order.rating)
 
         ob.show_book()
 

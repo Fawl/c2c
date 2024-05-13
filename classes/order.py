@@ -1,10 +1,12 @@
 import csv
 import datetime
 import os
+import heapq
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from collections import defaultdict
 from queue import Queue
+
 
 
 # from client import Client
@@ -12,7 +14,7 @@ from queue import Queue
 
 
 class Order:
-    def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int) -> None:
+    def __init__(self, id: str, time: datetime.datetime.date, client, instrument, side: bool, price: float | None, quantity: int, rating: int) -> None:
         '''
         Class representing a single order
         @param time: datetime
@@ -28,6 +30,7 @@ class Order:
         self.client: None = client # replace with client
         self.instrument: None = instrument # replace with instrument
         self.side: bool = side # TRUE: buy, FALSE: sell
+        self.rating: int = rating
 
         if price == "Market":
             self.price = None
@@ -42,6 +45,33 @@ class Order:
 
     def __str__(self):
         return f"{self.id} {self.instrument} {self.side} {self.quantity} @ {self.price}"
+    
+    def __lt__(self, obj):
+        """self < obj."""
+        if self.price == obj.price:
+            if self.rating == obj.rating:
+                return self.time > obj.time
+            else:
+                return self.rating > obj.rating
+        else:
+            if self.side: # buy
+                return self.price < obj.price
+            else: # sell
+                return self.price > obj.price
+
+    def __gt__(self, obj):
+        """self > obj."""
+        if self.price == obj.price:
+            if self.rating == obj.rating:
+                return self.time < obj.time
+            else:
+                return self.rating < obj.rating
+        else:
+            if self.side: # buy
+                return self.price > obj.price
+            else: # sell
+                return self.price < obj.price
+
 
 
 class OrderBook:
@@ -61,6 +91,7 @@ class OrderBook:
 
         self.to_process = Queue()
         self.trades = []
+        self.errors = []
 
     @property
     def max_bid(self) -> float: # max amount people are willing to pay
@@ -95,10 +126,11 @@ class OrderBook:
         self.order_id += 1
         return self.order_id
     
-    def log(self, incoming_order, book_order, price: float, size: int) -> str:
+    
+    def generate_trade_log(self, incoming_order, book_order, price: float, size: int) -> str:
         return f"{datetime.datetime.now()} EXECUTE: {incoming_order.client} #{incoming_order.id} BUY {book_order.client} #{book_order.id} SELL {size} {self.instrument} @ {price}"
         
-    def process_order(self, incoming_order: Order) -> None:
+    def process_order(self, incoming_order: Order, rating: int) -> None:
         '''
         Attempt to fill an incoming order, if not add to OB
         '''
@@ -112,19 +144,31 @@ class OrderBook:
                 incoming_order.price = self.min_bid
 
         # TODO: Add checks (?)
+        order_client = incoming_order.client
 
-        if incoming_order.side: # BUY
-            if incoming_order.price >= self.min_offer and self.offers:
-                self.process_match(incoming_order)
-            else:
-                self.bids[incoming_order.price].append(incoming_order)
-        else: # SELL
-            if incoming_order.price <= self.max_bid and self.bids:
-                self.process_match(incoming_order)
-            else:
-                self.offers[incoming_order.price].append(incoming_order)
+        try:
+            order_client.checkOrder(incoming_order)
 
-    def process_match(self, incoming_order: Order) -> None:
+            if incoming_order.side: # BUY
+                if incoming_order.price >= self.min_offer and self.offers:
+                    self.process_match(incoming_order, rating)
+                else:
+                    self.bids[incoming_order.price].append(
+                        (rating, incoming_order)
+                    )
+                    heapq.heapify(self.bids[incoming_order.price])
+            else: # SELL
+                if incoming_order.price <= self.max_bid and self.bids:
+                    self.process_match(incoming_order, rating)
+                else:
+                    self.offers[incoming_order.price].append(
+                        (rating, incoming_order)
+                    )
+                    heapq.heapify(self.offers[incoming_order.price])
+        except Exception as e:
+            self.errors.append(e)
+
+    def process_match(self, incoming_order: Order, rating: int) -> None:
         '''
         Matching algo, price-time (add rating later) priority
         '''
@@ -144,9 +188,11 @@ class OrderBook:
             if incoming_order.quantity == 0 or does_not_match(price):
                 break
 
-            order_stack: List[Order] = levels[price]
+            # order_pq: List[Tuple[int, Order]] = levels[price]
 
-            for order_idx, book_order in enumerate(order_stack):
+            for order_idx, book_order_with_rating in enumerate(levels[price]):
+                rating, book_order = book_order_with_rating
+
                 incoming_qty: int = max(0, incoming_order.quantity) # guaranteed > 0 ?
                 book_qty: int = max(0, book_order.quantity)
 
@@ -157,25 +203,39 @@ class OrderBook:
                 incoming_order.quantity -= trade_size
                 book_order.quantity -= trade_size
 
-                res: str = self.log(incoming_order, book_order, price, trade_size)
+                if trade_size == 0:
+                    continue
+
+                res: str = self.generate_trade_log(incoming_order, book_order, price, trade_size)
 
                 self.trades.append(res)
 
-            levels[price] = [o for o in order_stack if o.quantity > 0]
+            # Remove orders with quantity 0
+            # print(order_pq)
+
+            levels[price] = [o for o in levels[price] if o[1].quantity > 0]
+
+            # for order_w_rating in levels[price]:
+            #     rating, order = order_w_rating
+            #     print(rating, order.quantity)
+
+            heapq.heapify(levels[price])
 
             if len(levels[price]) == 0: # no more orders at price
                 levels.pop(price)
 
+            # self.show_book()
+
         if incoming_order.quantity > 0:
             orders_at_side = self.offers if is_sell else self.bids
-            orders_at_side[incoming_order.price].append(incoming_order)
+            orders_at_side[incoming_order.price].append((rating, incoming_order))
 
     def show_book(self):
         bid_prices = sorted(self.bids.keys(), reverse=True)
         offer_prices = sorted(self.offers.keys())
 
-        bid_sizes = [sum(o.quantity for o in self.bids[p]) for p in bid_prices]
-        offer_sizes = [sum(o.quantity for o in self.offers[p]) for p in offer_prices]
+        bid_sizes = [sum(o[1].quantity for o in self.bids[p]) for p in bid_prices]
+        offer_sizes = [sum(o[1].quantity for o in self.offers[p]) for p in offer_prices]
 
         print()
         print("=== BOOK ===")
@@ -200,5 +260,7 @@ class OrderBook:
         else:
             for trade in self.trades:
                 print(trade)
+            for error in self.errors:
+                print(error)
 
     
